@@ -1273,6 +1273,7 @@
         let communicationsListener = null;
         let pollsListener = null; // NUOVA RIGA
         let reportsListener = null; // NUOVA RIGA
+        let urgentReportsListener = null;
         let navigationHistory = [];
         let servicePermissions = null;
         let currentStoragePath = '';
@@ -1625,6 +1626,9 @@ let selectedCommunicationFiles = []; // Array per i file della comunicazione
                 }
                 if (typeof checkForNewReports === 'function') {
                     checkForNewReports();
+                }
+                if (typeof checkForNewUrgentReports === 'function') {
+                    checkForNewUrgentReports();
                 }
 
                 // Re-render the current page to show latest data
@@ -2171,7 +2175,8 @@ let selectedCommunicationFiles = []; // Array per i file della comunicazione
             if (['supervisore', 'adm', 'amministratore', 'consigliere'].includes(userRole)) {
                 menuItemsHtml.push(`
                     <div onclick="navigateTo('segnalazioni_urgenti')" class="dashboard-item">
-                        <div class="dashboard-card" style="border: 2px solid var(--danger);">
+                        <div class="dashboard-card" style="border: 2px solid var(--danger); position: relative;">
+                            <span id="solleciti-menu-notification-badge" class="notification-badge hidden" style="top: 8px; right: 8px;"></span>
                             <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
                         </div>
                         <p>Solleciti</p>
@@ -4315,6 +4320,7 @@ ${formRecipientField}
                 checkForNewCommunications();
                 checkForNewPolls();
                 checkForNewReports();
+                checkForNewUrgentReports();
             }
         };
 
@@ -7940,6 +7946,9 @@ const loadReceivedReports = () => {
             const mainContainer = document.getElementById('reports-main-container');
             if (!mainContainer) return;
 
+            localStorage.setItem(`lastSeenUrgentReport_${currentUser.uid}`, Date.now().toString());
+            updateNotificationUI('solleciti', 0);
+
             // Nota: Questa query richiede un indice composito in Firestore su (isUrgent, createdAt).
             // L'errore nella console di Firebase indicherà il link per crearlo automaticamente.
             const urgentQuery = query(collection(db, "reports"), where("isUrgent", "==", true), orderBy("createdAt", "desc"));
@@ -9131,6 +9140,22 @@ const loadReceivedReports = () => {
             });
         };
 
+        const checkForNewUrgentReports = () => {
+            if (!currentUser || !['supervisore', 'adm', 'amministratore', 'consigliere'].includes(userProfile?.tipoUtente)) return;
+
+            urgentReportsListener && urgentReportsListener();
+
+            const lastSeen = parseInt(localStorage.getItem(`lastSeenUrgentReport_${currentUser.uid}`), 10) || 0;
+            const lastSeenDate = new Date(lastSeen);
+
+            const q = query(collection(db, "reports"), where("isUrgent", "==", true), where("updatedAt", ">", lastSeenDate));
+
+            urgentReportsListener = onSnapshot(q, snapshot => {
+                const unreadCount = snapshot.size;
+                updateNotificationUI('solleciti', unreadCount);
+            });
+        };
+
         window.navigateTo = navigateTo;
         window.navigateBack = navigateBack;
         window.logout = logout;
@@ -9273,6 +9298,10 @@ const loadReceivedReports = () => {
                 if (reportsListener) { // NUOVO BLOCCO
                     reportsListener();
                     reportsListener = null;
+                }
+                if (urgentReportsListener) {
+                    urgentReportsListener();
+                    urgentReportsListener = null;
                 }
                 currentUser = null;
                 userProfile = null;
