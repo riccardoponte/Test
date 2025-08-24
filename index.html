@@ -7898,28 +7898,28 @@ const loadReceivedReports = () => {
     // Snapshot listener
     onSnapshot(baseQuery, (snapshot) => {
         let relevantDocs = [];
-        if (isAdmin) {
-            // L'amministratore vede ticket a lui assegnati, quelli assegnati a fornitori da lui e quelli per lo sviluppatore
+
+        // CORREZIONE: Supervisore e ADM vedono tutte le segnalazioni.
+        if (userRole === 'supervisore' || userRole === 'adm') {
+            relevantDocs = snapshot.docs;
+        } else if (isAdmin) {
+            // La logica specifica per l'amministratore rimane invariata.
             relevantDocs = snapshot.docs.filter(doc => {
                 const data = doc.data();
                 return data.recipientType === 'amministratore' || 
                        data.recipientType === 'sviluppatore' || 
                        (data.recipientType === 'fornitore' && data.reassignedBy === currentUser.uid);
             });
-        } else if (['custode', 'consigliere', 'fornitore', 'supervisore', 'adm'].includes(userRole)) {
-            // Altri ruoli manager vedono solo i propri ticket
+        } else if (['custode', 'consigliere', 'fornitore'].includes(userRole)) {
+             // La logica per gli altri ruoli manager rimane invariata.
             if (userRole === 'custode') {
-                // Il custode vede i ticket a lui assegnati e quelli che ha inoltrato all'amministratore
                 relevantDocs = snapshot.docs.filter(doc => {
                     const data = doc.data();
                     return data.recipientType === userRole || 
                            (data.recipientType === 'amministratore' && data.forwardedBy && data.originalRecipient === 'custode');
                 });
-            } else if (userRole === 'fornitore') {
-                // Il fornitore vede i ticket a lui assegnati
-                relevantDocs = snapshot.docs.filter(doc => doc.data().recipientType === userRole);
             } else {
-                relevantDocs = snapshot.docs.filter(doc => doc.data().recipientType === userRole);
+                 relevantDocs = snapshot.docs.filter(doc => doc.data().recipientType === userRole);
             }
         }
         
