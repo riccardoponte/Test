@@ -7545,9 +7545,6 @@ const recipient = document.getElementById("report-recipient").value;
                     // --- MODIFICA SUPERVISORE FINE ---
                 }
                 if (userProfile?.tipoUtente === 'amministratore') {
-                     if (report.status === 'in-corso') {
-                        actionButtonsHtml += `<button onclick="updateReportStatus('${reportId}', 'risolta')" class="btn btn-primary" style="flex:1;">Marca come Risolta</button>`;
-                    }
     if (report.status === 'aperta' || report.status === 'in-corso') {
         actionButtonsHtml += `<button onclick="openReassignmentModal('${reportId}')" class="btn btn-secondary" style="flex:1; background-color: var(--warning); color: var(--bg-color);">Riassegna</button>`;
     }
