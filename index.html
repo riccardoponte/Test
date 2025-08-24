@@ -1280,6 +1280,9 @@
         let selectedUploadPath = ''; // Nuova variabile per il percorso di upload scelto
         let selectedReportFiles = []; // Array per i file della segnalazione
 let selectedCommunicationFiles = []; // Array per i file della comunicazione
+let unreadRegularReportsCount = 0;
+let unreadUrgentReportsCount = 0;
+
 
         // Stato per la registrazione, reso globale a livello di modulo per un reset corretto
         let groupedProperties = {};
@@ -7136,7 +7139,7 @@ const recipient = document.getElementById("report-recipient").value;
                     const snapshot = await getDocs(latestCommQuery);
                     if (!snapshot.empty) {
                         localStorage.setItem(`lastSeenComm_${currentUser.uid}`, snapshot.docs[0].data().createdAt.toMillis());
-                        updateNotificationUI('bacheca', 0);
+                    updateSingleServiceNotification('bacheca', 0);
                     }
                 }
             } catch (error) {
@@ -7201,7 +7204,7 @@ const recipient = document.getElementById("report-recipient").value;
         if (currentPage === 'bacheca_tutte' && !snapshot.empty) {
             const latestCommTimestamp = snapshot.docs.length > 0 ? snapshot.docs[0].data().createdAt.toMillis() : Date.now();
             localStorage.setItem(`lastSeenComm_${currentUser.uid}`, latestCommTimestamp);
-            updateNotificationUI('bacheca', 0);
+            updateSingleServiceNotification('bacheca', 0);
         }
     });
 };
@@ -7288,7 +7291,7 @@ const recipient = document.getElementById("report-recipient").value;
                 getDocs(q).then(snapshot => {
                     if (!snapshot.empty) {
                         localStorage.setItem(`lastSeenPoll_${currentUser.uid}`, snapshot.docs[0].data().createdAt.toMillis());
-                        updateNotificationUI('sondaggi', 0);
+                        updateSingleServiceNotification('sondaggi', 0);
                     }
                 });
             }
@@ -7880,14 +7883,10 @@ const loadReceivedReports = () => {
         }
     };
 
-    // Logica di reset notifiche
-    const q = query(collection(db, "reports"), orderBy("createdAt", "desc"), limit(1));
-    getDocs(q).then(snapshot => {
-        if (!snapshot.empty) {
-            localStorage.setItem(`lastSeenReport_${currentUser.uid}`, snapshot.docs[0].data().createdAt.toMillis());
-            updateNotificationUI('segnalazioni', 0);
-        }
-    });
+    // Nuova logica di reset notifiche per i report non urgenti
+    unreadRegularReportsCount = 0;
+    localStorage.setItem(`lastSeenReport_${currentUser.uid}`, Date.now().toString());
+    updateCombinedReportNotifications();
 
     // Query base
     const baseQuery = query(collection(db, "reports"), orderBy("createdAt", "desc"));
@@ -7946,8 +7945,9 @@ const loadReceivedReports = () => {
             const mainContainer = document.getElementById('reports-main-container');
             if (!mainContainer) return;
 
+            unreadUrgentReportsCount = 0;
             localStorage.setItem(`lastSeenUrgentReport_${currentUser.uid}`, Date.now().toString());
-            updateNotificationUI('solleciti', 0);
+            updateCombinedReportNotifications();
 
             // Nota: Questa query richiede un indice composito in Firestore su (isUrgent, createdAt).
             // L'errore nella console di Firebase indicherà il link per crearlo automaticamente.
@@ -9089,23 +9089,30 @@ const loadReceivedReports = () => {
             }
         };
 
-        const updateNotificationUI = (service, count) => {
+        const updateSingleServiceNotification = (service, count) => {
             const navBadge = document.getElementById(`${service}-notification-badge`);
             const dashboardBadge = document.getElementById(`dashboard-${service}-badge`);
             const menuBadge = document.getElementById(`${service}-menu-notification-badge`);
-            const badges = [navBadge, dashboardBadge, menuBadge];
+            // Note: 'solleciti' does not have a dashboard badge, only a menu badge.
+            const badges = [navBadge, dashboardBadge, menuBadge].filter(b => b); // Filter out nulls
 
             badges.forEach(badge => {
-                if (badge) {
-                    const shouldBeHidden = count === 0;
-                    badge.classList.toggle("hidden", shouldBeHidden);
-                    if (!shouldBeHidden) {
-                        badge.textContent = count > 9 ? '9+' : count;
-                    }
+                const shouldBeHidden = count === 0;
+                badge.classList.toggle("hidden", shouldBeHidden);
+                if (!shouldBeHidden) {
+                    badge.textContent = count > 99 ? '99+' : count.toString();
                 }
             });
         };
-        const checkForNewCommunications = () => { if (!currentUser || "custode" === userProfile?.tipoUtente) return; communicationsListener && communicationsListener(); const e = parseInt(localStorage.getItem(`lastSeenComm_${currentUser.uid}`), 10) || 0, t = new Date(e), o = query(collection(db, "communications"), where("createdAt", ">", t)); communicationsListener = onSnapshot(o, snapshot => { const unreadCount = snapshot.docs.filter(docSnap => { const comm = docSnap.data(); const userGroups = userProfile.proprieta?.map(p => p.gruppo).filter(Boolean) || []; if (!comm.targetGroup || comm.targetGroup === 'Tutti') return true; return userGroups.includes(comm.targetGroup); }).length; updateNotificationUI('bacheca', unreadCount) }) };
+
+        const updateCombinedReportNotifications = () => {
+            const totalReportCount = unreadRegularReportsCount + unreadUrgentReportsCount;
+            // Update the main 'segnalazioni' badges with the total count
+            updateSingleServiceNotification('segnalazioni', totalReportCount);
+            // Update the specific 'solleciti' badge with only the urgent count
+            updateSingleServiceNotification('solleciti', unreadUrgentReportsCount);
+        };
+        const checkForNewCommunications = () => { if (!currentUser || "custode" === userProfile?.tipoUtente) return; communicationsListener && communicationsListener(); const e = parseInt(localStorage.getItem(`lastSeenComm_${currentUser.uid}`), 10) || 0, t = new Date(e), o = query(collection(db, "communications"), where("createdAt", ">", t)); communicationsListener = onSnapshot(o, snapshot => { const unreadCount = snapshot.docs.filter(docSnap => { const comm = docSnap.data(); const userGroups = userProfile.proprieta?.map(p => p.gruppo).filter(Boolean) || []; if (!comm.targetGroup || comm.targetGroup === 'Tutti') return true; return userGroups.includes(comm.targetGroup); }).length; updateSingleServiceNotification('bacheca', unreadCount) }) };
 
         const checkForNewPolls = () => {
             if (!currentUser || "custode" === userProfile?.tipoUtente) return;
@@ -9115,7 +9122,7 @@ const loadReceivedReports = () => {
             const q = query(collection(db, "polls"), where("createdAt", ">", lastSeenDate));
             pollsListener = onSnapshot(q, snapshot => {
                 const unreadCount = snapshot.size; // Per i sondaggi, tutti i nuovi sono rilevanti
-                updateNotificationUI('sondaggi', unreadCount);
+                updateSingleServiceNotification('sondaggi', unreadCount);
             });
         };
 
@@ -9135,8 +9142,10 @@ const loadReceivedReports = () => {
             }
 
             reportsListener = onSnapshot(q, snapshot => {
-                const unreadCount = snapshot.size;
-                updateNotificationUI('segnalazioni', unreadCount);
+                // Filtra i report non urgenti, dato che quelli urgenti sono gestiti da un'altra funzione.
+                const regularReports = snapshot.docs.filter(doc => !doc.data().isUrgent);
+                unreadRegularReportsCount = regularReports.length;
+                updateCombinedReportNotifications();
             });
         };
 
@@ -9151,8 +9160,8 @@ const loadReceivedReports = () => {
             const q = query(collection(db, "reports"), where("isUrgent", "==", true), where("updatedAt", ">", lastSeenDate));
 
             urgentReportsListener = onSnapshot(q, snapshot => {
-                const unreadCount = snapshot.size;
-                updateNotificationUI('solleciti', unreadCount);
+                unreadUrgentReportsCount = snapshot.size;
+                updateCombinedReportNotifications();
             });
         };
 
