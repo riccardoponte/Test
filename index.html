@@ -2355,7 +2355,7 @@ ${formRecipientField}
 
         const renderSegnalazioniElenco = (title) => {
             const isFornitore = userProfile?.tipoUtente === 'fornitore';
-            const shouldShowControls = isFornitore;
+            const shouldShowControls = true;
             
             const fornitoreControlsHtml = shouldShowControls ? `
                 <div id="ticket-counters" class="grid grid-cols-3 gap-2" style="margin-bottom: 1rem;"></div>
@@ -7760,7 +7760,7 @@ const recipient = document.getElementById("report-recipient").value;
     const isFornitore = userProfile?.tipoUtente === 'fornitore';
     
     // Contatori e Filtri per amministratore, custode e fornitore
-    const shouldShowControls = isAdmin || isCustode || isFornitore;
+    const shouldShowControls = true;
     const adminControlsHtml = shouldShowControls ? `
         <div id="ticket-counters" class="grid grid-cols-3 gap-2" style="margin-bottom: 1rem;"></div>
         <div class="card" style="margin-bottom: 1.5rem; padding: 1rem;">
