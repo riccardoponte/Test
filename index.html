@@ -7551,14 +7551,18 @@ const recipient = document.getElementById("report-recipient").value;
                      if (report.status === 'in-corso') {
                         actionButtonsHtml += `<button onclick="updateReportStatus('${reportId}', 'risolta')" class="btn btn-primary" style="flex:1;">Marca come Risolta</button>`;
                     }
-    if (report.status === 'aperta' || report.status === 'in-corso') {
-        actionButtonsHtml += `<button onclick="openReassignmentModal('${reportId}')" class="btn btn-secondary" style="flex:1; background-color: var(--warning); color: var(--bg-color);">Riassegna</button>`;
-    }
-    // NUOVA LOGICA: Pulsante per chiudere ticket risolti
-    if (report.status === 'risolta') {
-        actionButtonsHtml += `<button onclick="updateReportStatus('${reportId}', 'chiusa', 'Segnalazione chiusa dall\\'amministratore.')" class="btn btn-primary" style="flex:1;">Chiudi Segnalazione</button>`;
-    }
-}
+                    if (report.status === 'aperta' || report.status === 'in-corso') {
+                        actionButtonsHtml += `<button onclick="openReassignmentModal('${reportId}')" class="btn btn-secondary" style="flex:1; background-color: var(--warning); color: var(--bg-color);">Riassegna</button>`;
+                    }
+                }
+                // NUOVA LOGICA: Pulsante per chiudere ticket risolti per Amministratore e Supervisore
+                if ((userProfile?.tipoUtente === 'amministratore' || userProfile?.tipoUtente === 'supervisore') && report.status === 'risolta') {
+                    if (userProfile?.tipoUtente === 'amministratore') {
+                        actionButtonsHtml += `<button onclick="updateReportStatus('${reportId}', 'chiusa', 'Segnalazione chiusa dall\\'amministratore.')" class="btn btn-primary" style="flex:1;">Chiudi Segnalazione</button>`;
+                    } else { // Supervisore
+                        actionButtonsHtml += `<button onclick="updateReportStatus('${reportId}', 'chiusa', 'Segnalazione chiusa dal Supervisore.')" class="btn btn-primary" style="flex:1;">Chiudi Segnalazione</button>`;
+                    }
+                }
                 if (userProfile?.tipoUtente === 'custode' && (report.status === 'aperta' || report.status === 'in-corso')) {
                     actionButtonsHtml += `<button onclick="forwardReportToAdmin('${reportId}')" class="btn btn-secondary" style="flex:1; background-color: var(--accent-color-dark); color: white; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Inoltra ad Amministratore</button>`;
                 }
