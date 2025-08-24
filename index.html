@@ -1569,12 +1569,6 @@ let unreadUrgentReportsCount = 0;
             }
             // --- FINE NUOVA LOGICA ---
 
-            // --- NUOVA LOGICA DI REINDIRIZZAMENTO PER SUPERVISORE/ADM ---
-            if (['supervisore', 'adm'].includes(userProfile?.tipoUtente) && e === 'segnalazioni') {
-                e = 'segnalazioni_ricevute'; // Reindirizza direttamente alla lista
-            }
-            // --- FINE NUOVA LOGICA ---
-
             if (navigationHistory[navigationHistory.length - 1] !== e) {
                 navigationHistory.push(e);
             }
@@ -1873,8 +1867,10 @@ let unreadUrgentReportsCount = 0;
     `);
             }
             if (isServiceEnabledForCurrentUser('segnalazioni')) {
+    const userRole = userProfile?.tipoUtente;
+    const segnalazioniPage = (userRole === 'supervisore' || userRole === 'adm') ? 'segnalazioni_ricevute' : 'segnalazioni';
     dashboardItemsHtml.push(`
-        <div onclick="navigateTo('segnalazioni')" class="dashboard-item">
+        <div onclick="navigateTo('${segnalazioniPage}')" class="dashboard-item">
             <div class="dashboard-card" style="position: relative;">
                 <span id="dashboard-segnalazioni-badge" class="notification-badge hidden" style="top: 8px; right: 8px;"></span>
                 <svg fill="currentColor" viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
@@ -7551,6 +7547,12 @@ const recipient = document.getElementById("report-recipient").value;
                     // --- MODIFICA SUPERVISORE FINE ---
                 }
                 if (userProfile?.tipoUtente === 'amministratore') {
+                    if (report.status === 'aperta') {
+                        actionButtonsHtml += `<button onclick="updateReportStatus('${reportId}', 'in-corso')" class="btn btn-primary" style="flex:1;">Prendi in Carico</button>`;
+                    }
+                     if (report.status === 'in-corso') {
+                        actionButtonsHtml += `<button onclick="updateReportStatus('${reportId}', 'risolta')" class="btn btn-primary" style="flex:1;">Marca come Risolta</button>`;
+                    }
     if (report.status === 'aperta' || report.status === 'in-corso') {
         actionButtonsHtml += `<button onclick="openReassignmentModal('${reportId}')" class="btn btn-secondary" style="flex:1; background-color: var(--warning); color: var(--bg-color);">Riassegna</button>`;
     }
