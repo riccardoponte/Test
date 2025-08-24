@@ -1569,6 +1569,12 @@ let unreadUrgentReportsCount = 0;
             }
             // --- FINE NUOVA LOGICA ---
 
+            // --- NUOVA LOGICA DI REINDIRIZZAMENTO PER SUPERVISORE/ADM ---
+            if (['supervisore', 'adm'].includes(userProfile?.tipoUtente) && e === 'segnalazioni') {
+                e = 'segnalazioni_ricevute'; // Reindirizza direttamente alla lista
+            }
+            // --- FINE NUOVA LOGICA ---
+
             if (navigationHistory[navigationHistory.length - 1] !== e) {
                 navigationHistory.push(e);
             }
