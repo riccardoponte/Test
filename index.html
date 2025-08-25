@@ -4148,15 +4148,15 @@ ${formRecipientField}
                     else navigateTo('dashboard');
                     break;
                 case 'orariCustode_manuale':
-                    if (userType === 'supervisore') content = renderOrariCustodeManuale();
+                    if (['supervisore', 'adm'].includes(userType)) content = renderOrariCustodeManuale();
                     else navigateTo('dashboard');
                     break;
                 case 'orariCustode_import':
-                    if (userType === 'supervisore') content = renderOrariCustodeImport();
+                    if (['supervisore', 'adm'].includes(userType)) content = renderOrariCustodeImport();
                     else navigateTo('dashboard');
                     break;
                 case 'orariCustode_visualizza':
-                    if (userType === 'supervisore') content = renderOrariCustodeVisualizza();
+                    if (['supervisore', 'adm'].includes(userType)) content = renderOrariCustodeVisualizza();
                     else navigateTo('dashboard');
                     break;
                 case 'datiAmministratore':
@@ -4164,15 +4164,15 @@ ${formRecipientField}
                     else navigateTo('dashboard');
                     break;
                 case 'datiAmministratore_manuale':
-                    if (userType === 'supervisore') content = renderDatiAmministratoreManuale();
+                    if (['supervisore', 'adm'].includes(userType)) content = renderDatiAmministratoreManuale();
                     else navigateTo('dashboard');
                     break;
                 case 'datiAmministratore_import':
-                    if (userType === 'supervisore') content = renderDatiAmministratoreImport();
+                    if (['supervisore', 'adm'].includes(userType)) content = renderDatiAmministratoreImport();
                     else navigateTo('dashboard');
                     break;
                 case 'datiAmministratore_visualizza':
-                    if (userType === 'supervisore') content = renderDatiAmministratoreVisualizza();
+                    if (['supervisore', 'adm'].includes(userType)) content = renderDatiAmministratoreVisualizza();
                     else navigateTo('dashboard');
                     break;
                 case 'reportPage':
