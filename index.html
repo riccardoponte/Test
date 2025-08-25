@@ -7508,71 +7508,93 @@ const recipient = document.getElementById("report-recipient").value;
 
             let actionButtonsHtml = '';
 
-            // Logica pulsanti per il gestore
-            if (canManageThisReport) {
-                if (report.status === 'aperta') {
-                    // --- MODIFICA SUPERVISORE/CONSIGLIERE: Visibilità condizionale "Prendi in Carico" ---
-                    // Il pulsante appare per tutti i manager, tranne per il supervisore se il ticket non è suo e per il consigliere.
-                    const isSupervisor = userProfile?.tipoUtente === 'supervisore';
-                    const isConsigliere = userProfile?.tipoUtente === 'consigliere';
-                    const isForSupervisor = report.recipientType === 'supervisore';
+            // --- INIZIO BLOCCO REFACTORIZZATO ---
 
-                    if ((!isSupervisor || (isSupervisor && isForSupervisor)) && !isConsigliere) {
-                         actionButtonsHtml += `<button onclick="updateReportStatus('${reportId}', 'in-corso')" class="btn btn-primary" style="flex:1;">Prendi in Carico</button>`;
-                    }
-                    // --- FINE MODIFICA ---
-                }
-                if (report.status === 'in-corso' && userProfile?.tipoUtente !== 'consigliere') {
-                    // --- MODIFICA SUPERVISORE INIZIO: Azione "Risolta" personalizzata ---
-                    if (userProfile?.tipoUtente === 'supervisore') {
-                        // Per il supervisore, l'azione aggiunge un commento specifico.
-                        actionButtonsHtml += `<button onclick="updateReportStatus('${reportId}', 'risolta', 'Risolto da Supervisore.')" class="btn btn-primary" style="flex:1;">Marca come Risolta</button>`;
-                    } else {
-                        // Gli altri ruoli usano l'azione standard.
-                        actionButtonsHtml += `<button onclick="updateReportStatus('${reportId}', 'risolta')" class="btn btn-primary" style="flex:1;">Marca come Risolta</button>`;
-                    }
-                    // --- MODIFICA SUPERVISORE FINE ---
-                }
-                if (userProfile?.tipoUtente === 'amministratore') {
-    if (report.status === 'aperta' || report.status === 'in-corso') {
-        actionButtonsHtml += `RIASSEGNA_BUTTON`;
-    }
-    // NUOVA LOGICA: Pulsante per chiudere ticket risolti
-    if (report.status === 'risolta') {
-        actionButtonsHtml += `<button onclick="updateReportStatus('${reportId}', 'chiusa', 'Segnalazione chiusa dall\\'amministratore.')" class="btn btn-primary" style="flex:1;">Chiudi Segnalazione</button>`;
-    }
-}
-                if (userProfile?.tipoUtente === 'custode' && (report.status === 'aperta' || report.status === 'in-corso')) {
-                    actionButtonsHtml += `<button onclick="forwardReportToAdmin('${reportId}')" class="btn btn-secondary" style="flex:1; background-color: var(--accent-color-dark); color: white; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Inoltra ad Amministratore</button>`;
-                }
-                
-                // Pulsante Aggiorna spostato sotto gli altri pulsanti di controllo
-                if (report.status !== 'chiusa') {
-                    // --- MODIFICA SUPERVISORE/CONSIGLIERE: Pulsante Aggiorna personalizzato ---
-                    if (userProfile?.tipoUtente === 'supervisore') {
-                        // Il supervisore ha un pulsante specifico per aggiungere commenti.
-                        actionButtonsHtml += `<button onclick="openReportUpdateModal('${reportId}')" class="btn btn-secondary" style="flex:1;">Commento da Supervisor</button>`;
-                    } else if (userProfile?.tipoUtente === 'consigliere') {
-                        // Il consigliere ha un pulsante specifico per i commenti.
-                        actionButtonsHtml += `<button onclick="openReportUpdateModal('${reportId}')" class="btn btn-secondary" style="flex:1;">Commento da Consigliere</button>`;
-                    } else {
-                        // Gli altri ruoli mantengono il pulsante standard.
-                        actionButtonsHtml += `<button onclick="openReportUpdateModal('${reportId}')" class="btn btn-secondary" style="flex:1;">Aggiorna</button>`;
-                    }
-                    // --- FINE MODIFICA ---
-                }
-            }
-
-            // Logica pulsanti per il creatore (solo se è un "condomino")
-            if (isCreator && userProfile?.tipoUtente === 'condomino') {
+            // CASO 1: L'utente è un amministratore.
+            // La sua logica è complessa e gestita separatamente per garantire il layout a due livelli.
+            if (userProfile?.tipoUtente === 'amministratore' && canManageThisReport) {
                 if (report.status === 'aperta' || report.status === 'in-corso') {
-                    actionButtonsHtml += `<button onclick="sendReportReminder('${reportId}')" class="btn btn-secondary" style="flex:1;">Sollecita</button>`;
+                    const riassegnaButton = `<button onclick="openReassignmentModal('${reportId}')" class="btn btn-secondary" style="flex:1; background-color: var(--warning); color: var(--bg-color);">Riassegna</button>`;
+                    const aggiornaButton = `<button onclick="openReportUpdateModal('${reportId}')" class="btn btn-secondary" style="flex:1;">Aggiorna</button>`;
+                    let topRowButtons = '';
+
+                    if (report.status === 'aperta') {
+                        const prendiInCaricoButton = `<button onclick="updateReportStatus('${reportId}', 'in-corso')" class="btn btn-primary" style="flex:1;">Prendi in Carico</button>`;
+                        topRowButtons = prendiInCaricoButton + riassegnaButton;
+                    } else { // Lo stato è 'in-corso'
+                        const marcaComeRisoltaButton = `<button onclick="updateReportStatus('${reportId}', 'risolta')" class="btn btn-primary" style="flex:1;">Marca come Risolta</button>`;
+                        topRowButtons = marcaComeRisoltaButton + riassegnaButton;
+                    }
+
+                    // Costruiamo la struttura finale a due livelli direttamente.
+                    actionButtonsHtml = `
+                    <div class="flex flex-col gap-2 mt-4">
+                        <div class="flex gap-2 w-full">
+                            ${topRowButtons}
+                        </div>
+                        ${aggiornaButton}
+                    </div>
+                    `;
+                } else if (report.status === 'risolta') {
+                    const chiudiButton = `<button onclick="updateReportStatus('${reportId}', 'chiusa', 'Segnalazione chiusa dall\\'amministratore.')" class="btn btn-primary" style="flex:1;">Chiudi Segnalazione</button>`;
+                    actionButtonsHtml = `<div class="flex flex-wrap gap-2 mt-4">${chiudiButton}</div>`;
                 }
-                if (report.status === 'risolta') {
-                    actionButtonsHtml += `<button onclick="confirmReportResolution('${reportId}', true)" class="btn btn-primary" style="flex:1;">Conferma Risoluzione</button>`;
-                    actionButtonsHtml += `<button onclick="confirmReportResolution('${reportId}', false)" class="btn" style="background:var(--danger); color:white; flex:1;">Non Risolto</button>`;
+
+            // CASO 2: L'utente non è un amministratore.
+            // La logica per gli altri manager e per i creatori viene gestita qui.
+            } else {
+                let buttons = ''; // Accumuliamo i pulsanti come stringa grezza
+
+                // Logica per gli altri gestori (custode, supervisore, etc.)
+                if (canManageThisReport) {
+                    if (report.status === 'aperta') {
+                        const isSupervisor = userProfile?.tipoUtente === 'supervisore';
+                        const isConsigliere = userProfile?.tipoUtente === 'consigliere';
+                        const isForSupervisor = report.recipientType === 'supervisore';
+
+                        if ((!isSupervisor || (isSupervisor && isForSupervisor)) && !isConsigliere) {
+                            buttons += `<button onclick="updateReportStatus('${reportId}', 'in-corso')" class="btn btn-primary" style="flex:1;">Prendi in Carico</button>`;
+                        }
+                    }
+                    if (report.status === 'in-corso' && userProfile?.tipoUtente !== 'consigliere') {
+                        if (userProfile?.tipoUtente === 'supervisore') {
+                            buttons += `<button onclick="updateReportStatus('${reportId}', 'risolta', 'Risolto da Supervisore.')" class="btn btn-primary" style="flex:1;">Marca come Risolta</button>`;
+                        } else {
+                            buttons += `<button onclick="updateReportStatus('${reportId}', 'risolta')" class="btn btn-primary" style="flex:1;">Marca come Risolta</button>`;
+                        }
+                    }
+                    if (userProfile?.tipoUtente === 'custode' && (report.status === 'aperta' || report.status === 'in-corso')) {
+                        buttons += `<button onclick="forwardReportToAdmin('${reportId}')" class="btn btn-secondary" style="flex:1; background-color: var(--accent-color-dark); color: white; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Inoltra ad Amministratore</button>`;
+                    }
+                    if (report.status !== 'chiusa') {
+                        if (userProfile?.tipoUtente === 'supervisore') {
+                            buttons += `<button onclick="openReportUpdateModal('${reportId}')" class="btn btn-secondary" style="flex:1;">Commento da Supervisor</button>`;
+                        } else if (userProfile?.tipoUtente === 'consigliere') {
+                            buttons += `<button onclick="openReportUpdateModal('${reportId}')" class="btn btn-secondary" style="flex:1;">Commento da Consigliere</button>`;
+                        } else {
+                            buttons += `<button onclick="openReportUpdateModal('${reportId}')" class="btn btn-secondary" style="flex:1;">Aggiorna</button>`;
+                        }
+                    }
+                }
+
+                // Logica per il creatore (condomino)
+                if (isCreator && userProfile?.tipoUtente === 'condomino') {
+                    if (report.status === 'aperta' || report.status === 'in-corso') {
+                        buttons += `<button onclick="sendReportReminder('${reportId}')" class="btn btn-secondary" style="flex:1;">Sollecita</button>`;
+                    }
+                    if (report.status === 'risolta') {
+                        buttons += `<button onclick="confirmReportResolution('${reportId}', true)" class="btn btn-primary" style="flex:1;">Conferma Risoluzione</button>`;
+                        buttons += `<button onclick="confirmReportResolution('${reportId}', false)" class="btn" style="background:var(--danger); color:white; flex:1;">Non Risolto</button>`;
+                    }
+                }
+
+                // Se sono stati aggiunti pulsanti, li avvolgiamo nel layout standard.
+                if (buttons) {
+                    actionButtonsHtml = `<div class="flex flex-wrap gap-2 mt-4">${buttons}</div>`;
                 }
             }
+
+            // --- FINE BLOCCO REFACTORIZZATO ---
 
             const updatesHtml = report.updates && report.updates.length > 0 ? `
                 <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--surface-color-light);">
@@ -7582,45 +7604,6 @@ const recipient = document.getElementById("report-recipient").value;
                     </ul>
                 </div>
             ` : '';
-
-            // --- INIZIO BLOCCO MODIFICATO ---
-            if (actionButtonsHtml) {
-                let finalHtml;
-                // Se è presente il marcatore per il pulsante "Riassegna" (caso specifico dell'admin per ticket aperti/in-corso)
-                if (actionButtonsHtml.includes('RIASSEGNA_BUTTON')) {
-                    // Ricostruiamo l'HTML dei pulsanti da zero per creare il layout a due livelli.
-                    // Questo approccio è più robusto della manipolazione di stringhe.
-
-                    const riassegnaButton = `<button onclick="openReassignmentModal('${reportId}')" class="btn btn-secondary" style="flex:1; background-color: var(--warning); color: var(--bg-color);">Riassegna</button>`;
-                    const aggiornaButton = `<button onclick="openReportUpdateModal('${reportId}')" class="btn btn-secondary" style="flex:1;">Aggiorna</button>`;
-
-                    let topRowButtons = '';
-                    if (report.status === 'aperta') {
-                        // Per lo stato 'aperta', i pulsanti sono "Prendi in Carico" e "Riassegna"
-                        const prendiInCaricoButton = `<button onclick="updateReportStatus('${reportId}', 'in-corso')" class="btn btn-primary" style="flex:1;">Prendi in Carico</button>`;
-                        topRowButtons = prendiInCaricoButton + riassegnaButton;
-                    } else if (report.status === 'in-corso') {
-                        // Per lo stato 'in-corso', i pulsanti sono "Marca come Risolta" e "Riassegna"
-                        const marcaComeRisoltaButton = `<button onclick="updateReportStatus('${reportId}', 'risolta')" class="btn btn-primary" style="flex:1;">Marca come Risolta</button>`;
-                        topRowButtons = marcaComeRisoltaButton + riassegnaButton;
-                    }
-
-                    // Costruiamo la struttura finale a due livelli
-                    finalHtml = `
-                    <div class="flex flex-col gap-2 mt-4">
-                        <div class="flex gap-2 w-full">
-                            ${topRowButtons}
-                        </div>
-                        ${aggiornaButton}
-                    </div>
-                    `;
-                } else {
-                    // Altrimenti, usa il layout flessibile standard a una riga per tutti gli altri casi
-                    finalHtml = `<div class="flex flex-wrap gap-2 mt-4">${actionButtonsHtml}</div>`;
-                }
-                actionButtonsHtml = finalHtml;
-            }
-            // --- FINE BLOCCO MODIFICATO ---
 
             return `
             <div class="card" style="margin-bottom: 1rem; position: relative;">
