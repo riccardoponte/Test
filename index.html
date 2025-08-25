@@ -1278,6 +1278,7 @@
         let currentStoragePath = '';
         let selectedUploadPath = ''; // Nuova variabile per il percorso di upload scelto
         let selectedReportFiles = []; // Array per i file della segnalazione
+let selectedUpdateFiles = []; // Array per i file del commento/aggiornamento
 let selectedCommunicationFiles = []; // Array per i file della comunicazione
 
         // Stato per la registrazione, reso globale a livello di modulo per un reset corretto
@@ -4867,6 +4868,37 @@ const removeCommunicationFile = (index) => {
     selectedCommunicationFiles.splice(index, 1);
     renderCommunicationFilePreviews();
 };
+
+// --- Funzioni per la gestione degli allegati della modale di aggiornamento ---
+
+const handleUpdateFileSelection = (event) => {
+    selectedUpdateFiles = [...selectedUpdateFiles, ...Array.from(event.target.files)];
+    renderUpdateFilePreviews();
+    event.target.value = ''; // Permette di selezionare lo stesso file di nuovo
+};
+
+const renderUpdateFilePreviews = () => {
+    const container = document.getElementById('update-attachment-previews-container');
+    if (!container) return;
+    container.innerHTML = selectedUpdateFiles.map((file, index) => {
+        const isVideo = file.type.startsWith('video/');
+        const objectURL = URL.createObjectURL(file);
+        return `
+        <div class="preview-item">
+            ${isVideo
+                ? `<video src="${objectURL}" preload="metadata"></video>`
+                : `<img src="${objectURL}" alt="${file.name}">`
+            }
+            <button class="preview-remove-btn" onclick="removeUpdateFile(${index})">&times;</button>
+        </div>`;
+    }).join('');
+};
+
+const removeUpdateFile = (index) => {
+    selectedUpdateFiles.splice(index, 1);
+    renderUpdateFilePreviews();
+};
+
 
         const uploadReportFiles = (reportId, files) => {
             const uploadPromises = files.map(file => {
@@ -8619,6 +8651,18 @@ const loadReceivedReports = () => {
                         <label for="update-text" class="form-label">Testo dell'aggiornamento</label>
                         <textarea id="update-text" rows="4" required class="form-textarea" placeholder="Scrivi qui l'aggiornamento..."></textarea>
                     </div>
+
+                    <!-- Sezione per Upload Allegati -->
+                    <div class="form-group">
+                        <label class="form-label">Aggiungi Allegati (Foto/Video)</label>
+                        <div class="attachment-upload-container" onclick="document.getElementById('update-attachments-input').click()">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="currentColor" style="margin: 0 auto 0.5rem; color: var(--secondary-text);"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+                            Tocca per aggiungere file
+                        </div>
+                        <input type="file" id="update-attachments-input" class="hidden" multiple accept="image/*,video/*" onchange="handleUpdateFileSelection(event)">
+                        <div id="update-attachment-previews-container" class="attachment-previews"></div>
+                    </div>
+
                     <div class="flex justify-end gap-4 pt-2">
                         <button type="button" class="btn btn-secondary" onclick="hideModal()">Annulla</button>
                         <button type="submit" class="btn btn-primary">Invia Aggiornamento</button>
@@ -8629,25 +8673,55 @@ const loadReceivedReports = () => {
 
             document.getElementById('report-update-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
+                const submitBtn = e.target.querySelector('button[type="submit"]');
                 const text = document.getElementById('update-text').value.trim();
-                if (!text) return;
 
-                const newUpdate = {
-                    text: text,
-                    by: `${userProfile.nome} ${userProfile.cognome}`,
-                    at: new Date()
-                };
+                if (!text && selectedUpdateFiles.length === 0) {
+                    alert("Scrivi un aggiornamento o aggiungi almeno un allegato.");
+                    return;
+                }
+
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Invio...';
 
                 try {
-                    await updateDoc(doc(db, "reports", reportId), {
+                    let uploadedFileUrls = [];
+                    if (selectedUpdateFiles.length > 0) {
+                        submitBtn.textContent = 'Caricamento file...';
+                        uploadedFileUrls = await uploadReportFiles(reportId, selectedUpdateFiles);
+                    }
+
+                    submitBtn.textContent = 'Salvataggio...';
+
+                    const newUpdate = {
+                        text: text,
+                        by: `${userProfile.nome} ${userProfile.cognome}`,
+                        at: new Date(),
+                        fileUrls: uploadedFileUrls
+                    };
+
+                    const firestoreUpdateData = {
                         updates: arrayUnion(newUpdate),
                         updatedAt: serverTimestamp()
-                    });
-                    await logActivity("report_comment_added", currentUser.uid, `${userProfile.nome} ${userProfile.cognome}`, { reportId: reportId });
+                    };
+
+                    if (uploadedFileUrls.length > 0) {
+                        firestoreUpdateData.fileUrls = arrayUnion(...uploadedFileUrls);
+                    }
+
+                    await updateDoc(doc(db, "reports", reportId), firestoreUpdateData);
+
+                    await logActivity("report_comment_added", currentUser.uid, `${userProfile.nome} ${userProfile.cognome}`, { reportId: reportId, text: text, attachments: uploadedFileUrls.length });
+
+                    selectedUpdateFiles = [];
+                    renderUpdateFilePreviews();
                     hideModal();
+
                 } catch (error) {
                     console.error("Errore nell'aggiungere l'aggiornamento:", error);
-                    alert("Si è verificato un errore.");
+                    alert("Si è verificato un errore durante l'invio dell'aggiornamento.");
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Invia Aggiornamento';
                 }
             });
         };
