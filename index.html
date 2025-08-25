@@ -7622,6 +7622,7 @@ const recipient = document.getElementById("report-recipient").value;
                         <div class="subtitle" style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.25rem;">
                             <span class="badge ${getPriorityColor(report.priority)}">${report.priority}</span>
                             <span class="badge ${getStatusColor(report.status)}">${report.status}</span>
+                            ${report.interestType ? `<span class="badge status-aperta">${report.interestType === 'condominiale' ? 'Condominiale' : 'Personale'}</span>` : ''}
                             <span class="badge status-aperta">Dest: ${report.recipientType.charAt(0).toUpperCase() + report.recipientType.slice(1)}</span>
                         </div>
                     </div>
