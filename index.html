@@ -7533,7 +7533,7 @@ const recipient = document.getElementById("report-recipient").value;
                 }
                 if (userProfile?.tipoUtente === 'amministratore') {
     if (report.status === 'aperta' || report.status === 'in-corso') {
-        actionButtonsHtml += `<button onclick="openReassignmentModal('${reportId}')" class="btn btn-secondary" style="flex:1; background-color: var(--warning); color: var(--bg-color);">Riassegna</button>`;
+        actionButtonsHtml += `RIASSEGNA_BUTTON`;
     }
     // NUOVA LOGICA: Pulsante per chiudere ticket risolti
     if (report.status === 'risolta') {
@@ -7581,6 +7581,45 @@ const recipient = document.getElementById("report-recipient").value;
                 </div>
             ` : '';
 
+            // --- INIZIO BLOCCO MODIFICATO ---
+            if (actionButtonsHtml) {
+                let finalHtml;
+                // Se è presente il marcatore per il pulsante "Riassegna" (caso specifico dell'admin per ticket aperti/in-corso)
+                if (actionButtonsHtml.includes('RIASSEGNA_BUTTON')) {
+                    // Ricostruiamo l'HTML dei pulsanti da zero per creare il layout a due livelli.
+                    // Questo approccio è più robusto della manipolazione di stringhe.
+
+                    const riassegnaButton = `<button onclick="openReassignmentModal('${reportId}')" class="btn btn-secondary" style="flex:1; background-color: var(--warning); color: var(--bg-color);">Riassegna</button>`;
+                    const aggiornaButton = `<button onclick="openReportUpdateModal('${reportId}')" class="btn btn-secondary" style="flex:1;">Aggiorna</button>`;
+
+                    let topRowButtons = '';
+                    if (report.status === 'aperta') {
+                        // Per lo stato 'aperta', i pulsanti sono "Prendi in Carico" e "Riassegna"
+                        const prendiInCaricoButton = `<button onclick="updateReportStatus('${reportId}', 'in-corso')" class="btn btn-primary" style="flex:1;">Prendi in Carico</button>`;
+                        topRowButtons = prendiInCaricoButton + riassegnaButton;
+                    } else if (report.status === 'in-corso') {
+                        // Per lo stato 'in-corso', i pulsanti sono "Marca come Risolta" e "Riassegna"
+                        const marcaComeRisoltaButton = `<button onclick="updateReportStatus('${reportId}', 'risolta')" class="btn btn-primary" style="flex:1;">Marca come Risolta</button>`;
+                        topRowButtons = marcaComeRisoltaButton + riassegnaButton;
+                    }
+
+                    // Costruiamo la struttura finale a due livelli
+                    finalHtml = `
+                    <div class="flex flex-col gap-2 mt-4">
+                        <div class="flex gap-2 w-full">
+                            ${topRowButtons}
+                        </div>
+                        ${aggiornaButton}
+                    </div>
+                    `;
+                } else {
+                    // Altrimenti, usa il layout flessibile standard a una riga per tutti gli altri casi
+                    finalHtml = `<div class="flex flex-wrap gap-2 mt-4">${actionButtonsHtml}</div>`;
+                }
+                actionButtonsHtml = finalHtml;
+            }
+            // --- FINE BLOCCO MODIFICATO ---
+
             return `
             <div class="card" style="margin-bottom: 1rem; position: relative;">
                 ${index !== null ? `<div style="position: absolute; top: 0.5rem; right: 0.5rem; background: var(--primary); color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: bold;">${index}</div>` : ''}
@@ -7624,7 +7663,7 @@ const recipient = document.getElementById("report-recipient").value;
                 <!-- FINE NUOVA SEZIONE -->
 
                 ${updatesHtml}
-                ${actionButtonsHtml ? `<div class="flex flex-wrap gap-2 mt-4">${actionButtonsHtml}</div>` : ''}
+                ${actionButtonsHtml}
             </div>`;
         };
 
