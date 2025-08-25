@@ -7889,9 +7889,12 @@ const loadReceivedReports = () => {
     // Snapshot listener
     onSnapshot(baseQuery, (snapshot) => {
     let relevantDocs = [];
-    if (['supervisore', 'adm'].includes(userRole)) {
-        // Supervisore e Admin vedono TUTTE le segnalazioni, senza filtri per destinatario.
+    if (userRole === 'adm') {
+        // L'Admin è l'unico che vede TUTTE le segnalazioni.
         relevantDocs = snapshot.docs;
+    } else if (userRole === 'supervisore') {
+        // IL SUPERVISORE (come un consigliere) VEDE SOLO LE SEGNALAZIONI PER I CONSIGLIERI.
+        relevantDocs = snapshot.docs.filter(doc => doc.data().recipientType === 'consigliere');
     } else if (isAdmin) {
         // L'amministratore vede ticket a lui assegnati e quelli per lo sviluppatore.
         relevantDocs = snapshot.docs.filter(doc => {
