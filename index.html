@@ -2182,7 +2182,7 @@ let selectedCommunicationFiles = []; // Array per i file della comunicazione
             // 2. Segnalazioni ricevute
             if (isManager) {
     // MODIFICA: Etichetta cambiata in "Segnalazioni Ricevute"
-    const label = userProfile?.tipoUtente === 'amministratore' ? 'Segnalazioni Ricevute' : 'Segnalazioni';
+    const label = ['amministratore', 'supervisore', 'adm'].includes(userProfile?.tipoUtente) ? 'Segnalazioni Ricevute' : 'Segnalazioni';
     menuItemsHtml.push(`
         <div onclick="navigateTo('segnalazioni_ricevute')" class="dashboard-item">
             <div class="dashboard-card" style="position: relative;">
@@ -7888,41 +7888,40 @@ const loadReceivedReports = () => {
     
     // Snapshot listener
     onSnapshot(baseQuery, (snapshot) => {
-        let relevantDocs = [];
-        if (isAdmin) {
-            // L'amministratore vede ticket a lui assegnati, quelli assegnati a fornitori da lui e quelli per lo sviluppatore
+    let relevantDocs = [];
+    if (['supervisore', 'adm'].includes(userRole)) {
+        // Supervisore e Admin vedono TUTTE le segnalazioni, senza filtri per destinatario.
+        relevantDocs = snapshot.docs;
+    } else if (isAdmin) {
+        // L'amministratore vede ticket a lui assegnati e quelli per lo sviluppatore.
+        relevantDocs = snapshot.docs.filter(doc => {
+            const data = doc.data();
+            return data.recipientType === 'amministratore' || data.recipientType === 'sviluppatore';
+        });
+    } else if (['custode', 'consigliere', 'fornitore'].includes(userRole)) {
+        // Altri ruoli manager vedono solo i propri ticket
+        if (userRole === 'custode') {
+            // Il custode vede i ticket a lui assegnati e quelli che ha inoltrato all'amministratore
             relevantDocs = snapshot.docs.filter(doc => {
                 const data = doc.data();
-                return data.recipientType === 'amministratore' || 
-                       data.recipientType === 'sviluppatore' || 
-                       (data.recipientType === 'fornitore' && data.reassignedBy === currentUser.uid);
+                return data.recipientType === userRole ||
+                       (data.recipientType === 'amministratore' && data.forwardedBy && data.originalRecipient === 'custode');
             });
-        } else if (['custode', 'consigliere', 'fornitore', 'supervisore', 'adm'].includes(userRole)) {
-            // Altri ruoli manager vedono solo i propri ticket
-            if (userRole === 'custode') {
-                // Il custode vede i ticket a lui assegnati e quelli che ha inoltrato all'amministratore
-                relevantDocs = snapshot.docs.filter(doc => {
-                    const data = doc.data();
-                    return data.recipientType === userRole || 
-                           (data.recipientType === 'amministratore' && data.forwardedBy && data.originalRecipient === 'custode');
-                });
-            } else if (userRole === 'fornitore') {
-                // Il fornitore vede i ticket a lui assegnati
-                relevantDocs = snapshot.docs.filter(doc => doc.data().recipientType === userRole);
-            } else {
-                relevantDocs = snapshot.docs.filter(doc => doc.data().recipientType === userRole);
-            }
+        } else {
+            // Consigliere e Fornitore vedono solo i ticket a loro assegnati
+            relevantDocs = snapshot.docs.filter(doc => doc.data().recipientType === userRole);
         }
-        
-        // Esegui il primo rendering
-        renderTickets(relevantDocs);
+    }
 
-        // Aggiungi event listener ai filtri (per admin, custode e fornitore)
-        if (shouldShowControls) {
-            searchInput.oninput = () => renderTickets(relevantDocs);
-            statusFilter.onchange = () => renderTickets(relevantDocs);
-        }
-    });
+    // Esegui il primo rendering
+    renderTickets(relevantDocs);
+
+    // Aggiungi event listener ai filtri (per admin, custode e fornitore)
+    if (shouldShowControls) {
+        searchInput.oninput = () => renderTickets(relevantDocs);
+        statusFilter.onchange = () => renderTickets(relevantDocs);
+    }
+});
 };
 
         const renderSegnalazioniUrgenti = () => `
