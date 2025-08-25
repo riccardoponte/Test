@@ -937,10 +937,6 @@
             display: flex;
         }
 
-        .flex-wrap {
-            flex-wrap: wrap;
-        }
-
         .gap-2 {
             gap: 0.5rem;
         }
@@ -1277,16 +1273,12 @@
         let communicationsListener = null;
         let pollsListener = null; // NUOVA RIGA
         let reportsListener = null; // NUOVA RIGA
-        let urgentReportsListener = null;
         let navigationHistory = [];
         let servicePermissions = null;
         let currentStoragePath = '';
         let selectedUploadPath = ''; // Nuova variabile per il percorso di upload scelto
         let selectedReportFiles = []; // Array per i file della segnalazione
 let selectedCommunicationFiles = []; // Array per i file della comunicazione
-let unreadRegularReportsCount = 0;
-let unreadUrgentReportsCount = 0;
-
 
         // Stato per la registrazione, reso globale a livello di modulo per un reset corretto
         let groupedProperties = {};
@@ -1633,9 +1625,6 @@ let unreadUrgentReportsCount = 0;
                 }
                 if (typeof checkForNewReports === 'function') {
                     checkForNewReports();
-                }
-                if (typeof checkForNewUrgentReports === 'function') {
-                    checkForNewUrgentReports();
                 }
 
                 // Re-render the current page to show latest data
@@ -2182,8 +2171,7 @@ let unreadUrgentReportsCount = 0;
             if (['supervisore', 'adm', 'amministratore', 'consigliere'].includes(userRole)) {
                 menuItemsHtml.push(`
                     <div onclick="navigateTo('segnalazioni_urgenti')" class="dashboard-item">
-                        <div class="dashboard-card" style="border: 2px solid var(--danger); position: relative;">
-                            <span id="solleciti-menu-notification-badge" class="notification-badge hidden" style="top: 8px; right: 8px;"></span>
+                        <div class="dashboard-card" style="border: 2px solid var(--danger);">
                             <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
                         </div>
                         <p>Solleciti</p>
@@ -4160,15 +4148,15 @@ ${formRecipientField}
                     else navigateTo('dashboard');
                     break;
                 case 'orariCustode_manuale':
-                    if (['supervisore', 'adm'].includes(userType)) content = renderOrariCustodeManuale();
+                    if (userType === 'supervisore') content = renderOrariCustodeManuale();
                     else navigateTo('dashboard');
                     break;
                 case 'orariCustode_import':
-                    if (['supervisore', 'adm'].includes(userType)) content = renderOrariCustodeImport();
+                    if (userType === 'supervisore') content = renderOrariCustodeImport();
                     else navigateTo('dashboard');
                     break;
                 case 'orariCustode_visualizza':
-                    if (['supervisore', 'adm'].includes(userType)) content = renderOrariCustodeVisualizza();
+                    if (userType === 'supervisore') content = renderOrariCustodeVisualizza();
                     else navigateTo('dashboard');
                     break;
                 case 'datiAmministratore':
@@ -4176,15 +4164,15 @@ ${formRecipientField}
                     else navigateTo('dashboard');
                     break;
                 case 'datiAmministratore_manuale':
-                    if (['supervisore', 'adm'].includes(userType)) content = renderDatiAmministratoreManuale();
+                    if (userType === 'supervisore') content = renderDatiAmministratoreManuale();
                     else navigateTo('dashboard');
                     break;
                 case 'datiAmministratore_import':
-                    if (['supervisore', 'adm'].includes(userType)) content = renderDatiAmministratoreImport();
+                    if (userType === 'supervisore') content = renderDatiAmministratoreImport();
                     else navigateTo('dashboard');
                     break;
                 case 'datiAmministratore_visualizza':
-                    if (['supervisore', 'adm'].includes(userType)) content = renderDatiAmministratoreVisualizza();
+                    if (userType === 'supervisore') content = renderDatiAmministratoreVisualizza();
                     else navigateTo('dashboard');
                     break;
                 case 'reportPage':
@@ -4327,7 +4315,6 @@ ${formRecipientField}
                 checkForNewCommunications();
                 checkForNewPolls();
                 checkForNewReports();
-                checkForNewUrgentReports();
             }
         };
 
@@ -7143,7 +7130,7 @@ const recipient = document.getElementById("report-recipient").value;
                     const snapshot = await getDocs(latestCommQuery);
                     if (!snapshot.empty) {
                         localStorage.setItem(`lastSeenComm_${currentUser.uid}`, snapshot.docs[0].data().createdAt.toMillis());
-                    updateSingleServiceNotification('bacheca', 0);
+                        updateNotificationUI('bacheca', 0);
                     }
                 }
             } catch (error) {
@@ -7208,7 +7195,7 @@ const recipient = document.getElementById("report-recipient").value;
         if (currentPage === 'bacheca_tutte' && !snapshot.empty) {
             const latestCommTimestamp = snapshot.docs.length > 0 ? snapshot.docs[0].data().createdAt.toMillis() : Date.now();
             localStorage.setItem(`lastSeenComm_${currentUser.uid}`, latestCommTimestamp);
-            updateSingleServiceNotification('bacheca', 0);
+            updateNotificationUI('bacheca', 0);
         }
     });
 };
@@ -7295,7 +7282,7 @@ const recipient = document.getElementById("report-recipient").value;
                 getDocs(q).then(snapshot => {
                     if (!snapshot.empty) {
                         localStorage.setItem(`lastSeenPoll_${currentUser.uid}`, snapshot.docs[0].data().createdAt.toMillis());
-                        updateSingleServiceNotification('sondaggi', 0);
+                        updateNotificationUI('sondaggi', 0);
                     }
                 });
             }
@@ -7887,10 +7874,14 @@ const loadReceivedReports = () => {
         }
     };
 
-    // Nuova logica di reset notifiche per i report non urgenti
-    unreadRegularReportsCount = 0;
-    localStorage.setItem(`lastSeenReport_${currentUser.uid}`, Date.now().toString());
-    updateCombinedReportNotifications();
+    // Logica di reset notifiche
+    const q = query(collection(db, "reports"), orderBy("createdAt", "desc"), limit(1));
+    getDocs(q).then(snapshot => {
+        if (!snapshot.empty) {
+            localStorage.setItem(`lastSeenReport_${currentUser.uid}`, snapshot.docs[0].data().createdAt.toMillis());
+            updateNotificationUI('segnalazioni', 0);
+        }
+    });
 
     // Query base
     const baseQuery = query(collection(db, "reports"), orderBy("createdAt", "desc"));
@@ -7898,28 +7889,28 @@ const loadReceivedReports = () => {
     // Snapshot listener
     onSnapshot(baseQuery, (snapshot) => {
         let relevantDocs = [];
-
-        // CORREZIONE: Supervisore e ADM vedono tutte le segnalazioni.
-        if (userRole === 'supervisore' || userRole === 'adm') {
-            relevantDocs = snapshot.docs;
-        } else if (isAdmin) {
-            // La logica specifica per l'amministratore rimane invariata.
+        if (isAdmin) {
+            // L'amministratore vede ticket a lui assegnati, quelli assegnati a fornitori da lui e quelli per lo sviluppatore
             relevantDocs = snapshot.docs.filter(doc => {
                 const data = doc.data();
                 return data.recipientType === 'amministratore' || 
                        data.recipientType === 'sviluppatore' || 
                        (data.recipientType === 'fornitore' && data.reassignedBy === currentUser.uid);
             });
-        } else if (['custode', 'consigliere', 'fornitore'].includes(userRole)) {
-             // La logica per gli altri ruoli manager rimane invariata.
+        } else if (['custode', 'consigliere', 'fornitore', 'supervisore', 'adm'].includes(userRole)) {
+            // Altri ruoli manager vedono solo i propri ticket
             if (userRole === 'custode') {
+                // Il custode vede i ticket a lui assegnati e quelli che ha inoltrato all'amministratore
                 relevantDocs = snapshot.docs.filter(doc => {
                     const data = doc.data();
                     return data.recipientType === userRole || 
                            (data.recipientType === 'amministratore' && data.forwardedBy && data.originalRecipient === 'custode');
                 });
+            } else if (userRole === 'fornitore') {
+                // Il fornitore vede i ticket a lui assegnati
+                relevantDocs = snapshot.docs.filter(doc => doc.data().recipientType === userRole);
             } else {
-                 relevantDocs = snapshot.docs.filter(doc => doc.data().recipientType === userRole);
+                relevantDocs = snapshot.docs.filter(doc => doc.data().recipientType === userRole);
             }
         }
         
@@ -7948,10 +7939,6 @@ const loadReceivedReports = () => {
         const loadUrgentReports = () => {
             const mainContainer = document.getElementById('reports-main-container');
             if (!mainContainer) return;
-
-            unreadUrgentReportsCount = 0;
-            localStorage.setItem(`lastSeenUrgentReport_${currentUser.uid}`, Date.now().toString());
-            updateCombinedReportNotifications();
 
             // Nota: Questa query richiede un indice composito in Firestore su (isUrgent, createdAt).
             // L'errore nella console di Firebase indicherà il link per crearlo automaticamente.
@@ -9093,30 +9080,23 @@ const loadReceivedReports = () => {
             }
         };
 
-        const updateSingleServiceNotification = (service, count) => {
+        const updateNotificationUI = (service, count) => {
             const navBadge = document.getElementById(`${service}-notification-badge`);
             const dashboardBadge = document.getElementById(`dashboard-${service}-badge`);
             const menuBadge = document.getElementById(`${service}-menu-notification-badge`);
-            // Note: 'solleciti' does not have a dashboard badge, only a menu badge.
-            const badges = [navBadge, dashboardBadge, menuBadge].filter(b => b); // Filter out nulls
+            const badges = [navBadge, dashboardBadge, menuBadge];
 
             badges.forEach(badge => {
-                const shouldBeHidden = count === 0;
-                badge.classList.toggle("hidden", shouldBeHidden);
-                if (!shouldBeHidden) {
-                    badge.textContent = count > 99 ? '99+' : count.toString();
+                if (badge) {
+                    const shouldBeHidden = count === 0;
+                    badge.classList.toggle("hidden", shouldBeHidden);
+                    if (!shouldBeHidden) {
+                        badge.textContent = count > 9 ? '9+' : count;
+                    }
                 }
             });
         };
-
-        const updateCombinedReportNotifications = () => {
-            const totalReportCount = unreadRegularReportsCount + unreadUrgentReportsCount;
-            // Update the main 'segnalazioni' badges with the total count
-            updateSingleServiceNotification('segnalazioni', totalReportCount);
-            // Update the specific 'solleciti' badge with only the urgent count
-            updateSingleServiceNotification('solleciti', unreadUrgentReportsCount);
-        };
-        const checkForNewCommunications = () => { if (!currentUser || "custode" === userProfile?.tipoUtente) return; communicationsListener && communicationsListener(); const e = parseInt(localStorage.getItem(`lastSeenComm_${currentUser.uid}`), 10) || 0, t = new Date(e), o = query(collection(db, "communications"), where("createdAt", ">", t)); communicationsListener = onSnapshot(o, snapshot => { const unreadCount = snapshot.docs.filter(docSnap => { const comm = docSnap.data(); const userGroups = userProfile.proprieta?.map(p => p.gruppo).filter(Boolean) || []; if (!comm.targetGroup || comm.targetGroup === 'Tutti') return true; return userGroups.includes(comm.targetGroup); }).length; updateSingleServiceNotification('bacheca', unreadCount) }) };
+        const checkForNewCommunications = () => { if (!currentUser || "custode" === userProfile?.tipoUtente) return; communicationsListener && communicationsListener(); const e = parseInt(localStorage.getItem(`lastSeenComm_${currentUser.uid}`), 10) || 0, t = new Date(e), o = query(collection(db, "communications"), where("createdAt", ">", t)); communicationsListener = onSnapshot(o, snapshot => { const unreadCount = snapshot.docs.filter(docSnap => { const comm = docSnap.data(); const userGroups = userProfile.proprieta?.map(p => p.gruppo).filter(Boolean) || []; if (!comm.targetGroup || comm.targetGroup === 'Tutti') return true; return userGroups.includes(comm.targetGroup); }).length; updateNotificationUI('bacheca', unreadCount) }) };
 
         const checkForNewPolls = () => {
             if (!currentUser || "custode" === userProfile?.tipoUtente) return;
@@ -9126,7 +9106,7 @@ const loadReceivedReports = () => {
             const q = query(collection(db, "polls"), where("createdAt", ">", lastSeenDate));
             pollsListener = onSnapshot(q, snapshot => {
                 const unreadCount = snapshot.size; // Per i sondaggi, tutti i nuovi sono rilevanti
-                updateSingleServiceNotification('sondaggi', unreadCount);
+                updateNotificationUI('sondaggi', unreadCount);
             });
         };
 
@@ -9146,26 +9126,8 @@ const loadReceivedReports = () => {
             }
 
             reportsListener = onSnapshot(q, snapshot => {
-                // Filtra i report non urgenti, dato che quelli urgenti sono gestiti da un'altra funzione.
-                const regularReports = snapshot.docs.filter(doc => !doc.data().isUrgent);
-                unreadRegularReportsCount = regularReports.length;
-                updateCombinedReportNotifications();
-            });
-        };
-
-        const checkForNewUrgentReports = () => {
-            if (!currentUser || !['supervisore', 'adm', 'amministratore', 'consigliere'].includes(userProfile?.tipoUtente)) return;
-
-            urgentReportsListener && urgentReportsListener();
-
-            const lastSeen = parseInt(localStorage.getItem(`lastSeenUrgentReport_${currentUser.uid}`), 10) || 0;
-            const lastSeenDate = new Date(lastSeen);
-
-            const q = query(collection(db, "reports"), where("isUrgent", "==", true), where("updatedAt", ">", lastSeenDate));
-
-            urgentReportsListener = onSnapshot(q, snapshot => {
-                unreadUrgentReportsCount = snapshot.size;
-                updateCombinedReportNotifications();
+                const unreadCount = snapshot.size;
+                updateNotificationUI('segnalazioni', unreadCount);
             });
         };
 
@@ -9311,10 +9273,6 @@ const loadReceivedReports = () => {
                 if (reportsListener) { // NUOVO BLOCCO
                     reportsListener();
                     reportsListener = null;
-                }
-                if (urgentReportsListener) {
-                    urgentReportsListener();
-                    urgentReportsListener = null;
                 }
                 currentUser = null;
                 userProfile = null;
